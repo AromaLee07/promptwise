@@ -113,3 +113,4 @@ getSubscriptionByEmail = async (email) => {
     const subscription = await Subscribe.findOne({email})
     return subscription;
 }
+

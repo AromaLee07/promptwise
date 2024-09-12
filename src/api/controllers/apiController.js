@@ -7,18 +7,31 @@ let sysytemContent = "";
 let systemContent = "";
 const axios = require("axios");
 const qs = require("qs");
+require("dotenv").config(); // 确保环境变量被正确加载
+const crypto = require("crypto");
+const jwt = require("jsonwebtoken");
 
 
-
+const SERVER_URL = process.env.SERVER_URL;
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
-const REDIRECT_URI = "http://localhost:3000/auth/google/callback";
-const OPENAI_API_KEY = "sk-t8vvnuGyQ2jdB590IrfgkmBEMY9MSC8lZauRYOUlxTvyDqL8";
+// const REDIRECT_URI = "http://localhost:3000/auth/google/callback";
+// const REDIRECT_URI = `${SERVER_URL}/auth/google/callback`;
+// const REDIRECT_URI = "https://ec2-52-15-239-126.us-east-2.compute.amazonaws.com:3000/auth/google/callback";
+const REDIRECT_URI = process.env.REDIRECT_URI;
 
-exports.googleTest = async (req, res) => {
-  res.send("Callback reached");
-  console.log("xixihahahahah");
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+
+let extensionId = "";
+
+exports.getCookie = async (req, res) => {
+  const extensionIdReq = req.body;
+  extensionId = extensionIdReq.extensionId
+  console.log("extensionId is: ", extensionId);
+   // 处理逻辑
+   res.json({ message: 'Data received successfully' });
+
 };
 
 exports.googleLogin = async (req, res) => {
@@ -100,31 +113,71 @@ exports.googleCallback = async (req, res) => {
         }
       }
 
+      // 生成 JWT 密钥
+     const jwtSecret = generateJWTSecret();
+
       // 生成 JWT token
-      // const token = jwt.sign(
-      //   {
-      //     id: user._id,
-      //     email: user.email,
-      //     googleId: user.googleId,
-      //   },
-      //   process.env.JWT_SECRET,
-      //   { expiresIn: "1d" } // Token 有效期为1天
-      // );
+      const token = jwt.sign(
+        {
+          id: user._id,
+          email: user.email,
+          googleId: user.googleId,
+        },
+        jwtSecret,
+        { expiresIn: "1d" } // Token 有效期为1天
+      );
+
+       // 这里可以选择将用户数据存储在 cookie 中
+    res.cookie('jwt', token, { httpOnly: true, secure: true }); // 仅在 HTTPS 上使用
+
+
+    // 将用户重定向到前端页面，并附带用户信息
+    // res.redirect(
+    //   `chrome-extension://efhojinannanlccmmgmlkbclabplgikn/login.html?user=${encodeURIComponent(
+    //     JSON.stringify(userData)
+    //   )}`
+    // );
+
+    console.log("extensionId is ....:",extensionId)
+
+    res.redirect(
+      `chrome-extension://${extensionId}/login.html?user=${encodeURIComponent(
+        JSON.stringify(userData)
+      )}`
+    );
+
 
       // 将用户重定向到前端页面，并附带用户信息
-      res.redirect(
-        `chrome-extension://efhojinannanlccmmgmlkbclabplgikn/login.html?user=${encodeURIComponent(
-          JSON.stringify(userData)
-        )}`
-      );
+      // console.log("Extension ID:", chrome.runtime.id);
+      // const extensionId = chrome.runtime.id; // 动态获取扩展 ID
+      // res.redirect(
+      //   `chrome-extension://${extensionId}/login.html?user=${encodeURIComponent(
+      //     JSON.stringify(userData)
+      //   )}`
+      // );
+
+      // 返回用户数据
+      // return res.status(200).json({
+      //   success: true,
+      //   token: token,
+      //   userData: {
+      //     userId: existingUser._id.toHexString(),
+      //     username: existingUser.username,
+      //     email: existingUser.email,
+      //     avatarUrl: existingUser.avatarUrl,
+      //     clickCount: existingUser.dailyClicks.count,
+      //   },
+      //   // token: token // 将JWT附加到响应中
+      // });
 
       // 将用户重定向到前端页面，并附带 token
       // res.redirect(
       //   `chrome-extension://efhojinannanlccmmgmlkbclabplgikn/login.html?token=${encodeURIComponent(token)}`
       // );
 
-      console.log("userData is: ", userData);
+      // console.log("userData is: ", userData);
       // res.json(userData);
+      console.log("wochenggongle...........")
     } catch (error) {
       console.error("Error during Google login:", error);
       res.status(500).send("Authentication failed");
@@ -134,7 +187,7 @@ exports.googleCallback = async (req, res) => {
 
 // exports.googleCallback = async (req, res) => {};
 
-exports.generate = async (req, res) => {};
+// exports.generate = async (req, res) => {};
 
 exports.generate_kimi = async (req, res) => {
   console.log("req.body.category is: ", req.body.category);
@@ -148,8 +201,7 @@ exports.generate_kimi = async (req, res) => {
     // sysytemContent =
     //   "假设你是一个专业的音乐制作人, 对于如下给出的关键字, 模仿罗大佑的曲风，为用户生成提示词以确保能产出专业、高质量的歌曲，返回的提示词字数限制在200字以内";
     sysytemContent =
-    "假设你是一个专业的音乐制作人, 对于如下给出的关键字，为用户生成极具创意的提示词以确保能产出专业、高质量的歌曲，返回的提示词是以讲故事的方式，字数不能超过100字。请确保生成的歌词或曲风中不包含当前给定的关键词，而是根据关键词的意境进行展开。";
-  
+      "假设你是一个专业的音乐制作人, 对于如下给出的关键字，为用户生成极具创意的提示词以确保能产出专业、高质量的歌曲，返回的提示词是以讲故事的方式，字数不能超过100字。请确保生成的歌词或曲风中不包含当前给定的关键词，而是根据关键词的意境进行展开。";
   } else {
     sysytemContent =
       "你是 Kimi, 由 Moonshot AI 提供的人工智能助手, 你更擅长中文和英文的对话. 你会为用户提供安全, 有帮助, 准确的回答. 同时, 你会拒绝一切涉及恐怖主义, 种族歧视, 黄色暴力等问题的回答. Moonshot AI 为专有名词，不可翻译成其他语言.";
@@ -164,7 +216,7 @@ exports.generate_kimi = async (req, res) => {
     },
     { role: "user", content: content },
     // 添加一条消息以清除上下文
-    { role: "system", content: "清除上下文" }, 
+    { role: "system", content: "清除上下文" },
   ];
 
   try {
@@ -203,22 +255,23 @@ exports.generate_kimi = async (req, res) => {
 exports.generate = async (req, res) => {
   const { category, content } = req.body;
   const { theme, mimic, keys } = content;
-  const structure = "[Verse 1]\n第一段歌词，建立主题\n[Chorus]\n副歌部分，充满能量\n[Verse 2]\n第二段歌词，增加冲突或发展故事\n[Chorus]\n重复副歌\n[Solo]\n乐器独奏部分，通常是吉他\n[Bridge]\n过渡部分，带来新的元素\n[Chorus]\n再次重复副歌\n";
+  const structure =
+    "[Verse 1]\nThe first part of the lyrics, establish the theme\n[Chorus]\nThe refrain section, full of energy\n[Verse 2]\nThe second part of the lyrics, increase the conflict or develop the story\n[Chorus]\nRepeat the refrain\n[Solo]\nThe instrumental solo section, usually the guitar\n[Bridge]\nThe transition section, bringing new elements\n[Chorus]\nRepeat the refrain again\n";
 
   console.log("category is: ", category);
   console.log("content is: ", content);
   if (category == "lyricsGens") {
-    systemContent = `假设你是一位专业的音乐制作人，创作的主题是关于‘${theme}’。请模仿${mimic}的风格，创作出一首动人的歌曲。歌词按照以下结构给出：${structure}。请确保歌词富有诗意，能够引起听众的共鸣。要求给过来的答案只包括歌词，不要其他内容。`
+    systemContent = `Assuming you are a professional music producer, forget the previous conversation, please focus only on the following content now: creating a theme about '${theme}', please mimic the style of '${mimic}', incorporating the following keywords '${keys}', to create a touching song. The lyrics are given in the following structure: ${structure}. Please ensure that the lyrics are poetic and resonate with the audience. The answer should only include the lyrics, without any other content.`;
   } else if (category == "songGens") {
     // sysytemContent =
     //   "假设你是一个专业的音乐制作人, 对于如下给出的关键字, 模仿罗大佑的曲风，为用户生成提示词以确保能产出专业、高质量的歌曲，返回的提示词字数限制在200字以内";
-    systemContent =
-    "假设你是一个专业的音乐制作人, 对于如下给出的关键字，为用户生成极具创意的提示词以确保能产出专业、高质量的歌曲，返回的提示词是以讲故事的方式，字数不能超过100字。请确保生成的歌词或曲风中不包含当前给定的关键词，而是根据关键词的意境进行展开。";
-  
+    systemContent = `Assuming you are a professional music producer, forget the previous conversation, please focus only on the following content now: creating a theme about '${theme}', please mimic the style of '${mimic}' and combine the following keywords '${keys}' to generate a simple creative prompts for users to ensure the production of professional songs, ensure that the prompts result you generated do not exceed 200 characters.`;
   } else {
     systemContent =
-      "你是 GTP, 你更擅长中文和英文的对话. 你会为用户提供安全, 有帮助, 准确的回答. 同时, 你会拒绝一切涉及恐怖主义, 种族歧视, 黄色暴力等问题的回答. Moonshot AI 为专有名词，不可翻译成其他语言.";
+      "You are a GTP, specialized in conversations between Chinese and English. You provide safe, helpful, and accurate answers to users. At the same time, you reject answers related to terrorism, racism, and explicit violence. MoonshotAI is a proper noun and should not be translated into other languages.";
   }
+
+  console.log("systemContent is: ", systemContent);
 
   // const systemContent =
   // "假设你是一个专业的音乐制作人, 对于如下给出的关键字，为用户生成专业的歌词, 歌词的结构如下：'[Instrumetal intro]\n强劲的乐器前奏\n[Verse 1]\n第一段歌词，建立主题\n[Chorus]\n副歌部分，充满能量\n[Verse 2]\n第二段歌词，增加冲突或发展故事\n[Chorus]\n重复副歌\n[Solo]\n乐器独奏部分，通常是吉他\n[Bridge]\n过渡部分，带来新的元素\n[Chorus]\n再次重复副歌\n[Outro]\n结束部分，可能是乐器的渐弱'。请确保生成的歌词或曲风中不包含当前给定的关键词，而是根据关键词的意境进行展开。";
@@ -237,18 +290,18 @@ exports.generate = async (req, res) => {
           {
             role: "user",
             content: keys,
-          },
+          }
           // 添加一条消息以清除上下文
-          { role: "system", content: "清除上下文" },
+          // { role: "system", content: "清除上下文" },
         ],
         // max_tokens: req.body.max_tokens || 100, // optional
         // temperature: req.body.temperature || 0.7 // optional
       },
       {
         headers: {
-          'Authorization': `Bearer ${OPENAI_API_KEY}`, // 确保使用正确的 API 密钥
+          Authorization: `Bearer ${OPENAI_API_KEY}`, // 确保使用正确的 API 密钥
           "Content-Type": "application/json", // 确保内容类型正确
-          'Accept': "application/json", // 确保接受的内容类型正确
+          Accept: "application/json", // 确保接受的内容类型正确
           // 其他可能需要的头部
         },
       }
@@ -269,7 +322,7 @@ exports.generate = async (req, res) => {
 
     // res.json(content11);
     return res.status(200).json({
-      answer: content11
+      answer: content11,
     });
   } catch (error) {
     console.error("Error:", error);
@@ -278,3 +331,54 @@ exports.generate = async (req, res) => {
 };
 
 
+exports.googleLogin1 = async (req, res) => {
+  const { idToken } = req.body; // 从前端获取 Google ID Token
+
+  try {
+    // 验证 ID Token
+    const response = await axios.get(`https://oauth2.googleapis.com/tokeninfo?id_token=${idToken}`);
+    const { sub, name, email, picture } = response.data; // 获取用户信息
+
+    // 这里可以根据需要查找或创建用户
+    // 假设您有一个 User 模型
+    // const existingUser = await User.findOne({ googleId: sub });
+    // if (!existingUser) {
+    //   // 创建新用户
+    //   const newUser = new User({
+    //     googleId: sub,
+    //     username: name,
+    //     email: email,
+    //     avatarUrl: picture,
+    //   });
+    //   await newUser.save();
+    // }
+
+    // 生成 JWT
+    const token = jwt.sign({ id: sub }, process.env.JWT_SECRET, { expiresIn: '1h' });
+
+    // 将 JWT 存储在 cookie 中
+    res.cookie('jwt', token, { httpOnly: true, secure: true }); // 仅在 HTTPS 上使用
+
+    // 返回成功响应和用户数据
+    return res.status(200).json({
+      success: true,
+      token: token,
+      userData: {
+        userId: sub,
+        username: name,
+        email: email,
+        avatarUrl: picture,
+      },
+    });
+  } catch (error) {
+    console.error("Google 登录时发生错误:", error);
+    return res.status(500).json({
+      success: false,
+      message: 'An error occurred during Google login',
+    });
+  }
+}
+
+function generateJWTSecret() {
+  return crypto.randomBytes(32).toString("hex");
+}
